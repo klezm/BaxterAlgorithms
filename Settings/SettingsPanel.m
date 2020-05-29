@@ -29,6 +29,7 @@ classdef SettingsPanel < handle
     % 'path' - Textbox with the path of a directory. The text box has a
     %          browse button next to it which opens a directory selection
     %          GUI.
+    % 'file - same as path but for a single file.
     % 'check - Checkbox (does not work for arrays of parameter sets).
     % 'choice' - Popupmenu.
     % 'list' - List where multiple strings can be selected.
@@ -54,7 +55,7 @@ classdef SettingsPanel < handle
     % See also:
     % Setting, Map, ImageSetting, ImageData, SettingsGUI,
     % SegmentationPlayer, AllSettings
-    
+
     properties
         panel               % uipanel where the controls are put.
         controls            % Array of control objects for settings.
@@ -72,7 +73,7 @@ classdef SettingsPanel < handle
         shownCategories     % The setting categories currently displayed.
         removeFocus         % If this is true, the controls will never get focus.
     end
-    
+
     methods
         function this = SettingsPanel(aSettings, varargin)
             % Generates a SettingsPanel ready for user input.
@@ -111,7 +112,7 @@ classdef SettingsPanel < handle
             %               will flicker when the new values are entered,
             %               and therefore this feature is not used by
             %               default.
-            
+
             % Get additional inputs.
             [this.parameters, this.shownCategories, this.shownLevels,...
                 this.split, this.minList, this.maxList,...
@@ -122,20 +123,20 @@ classdef SettingsPanel < handle
                 {[], 'unspecified', 'basic', 0.5, 1, 10, 1, gcf(),...
                 [0 0 1 1], false},...
                 true, varargin);
-            
+
             this.panel = uipanel(...
                 'Parent', aParent,...
                 'Units', 'normalized',...
                 'Position', aPosition,...
                 'BackgroundColor', [0.8 0.8 0.8]);
-            
+
             if isstruct(aSettings)
                 % Convert a struct input to a Map.
                 this.settings = Map(aSettings);
             else
                 this.settings = aSettings;
             end
-            
+
             if isempty(this.parameters)
                 % If settings values are not specified, the default
                 % settings are used.
@@ -148,20 +149,20 @@ classdef SettingsPanel < handle
                 % Convert a struct input to a Map.
                 this.parameters = Map(this.parameters);
             end
-            
+
             this.labels = this.settings.GetLabels();
-            
+
             this.types = cell(this.settings.Size(),1);
             for i = 1:this.settings.Size()
                 this.types{i} = this.settings.Get(i).type;
             end
-            
+
             % Generate control objects for all settings. The visibilities
             % and positions are set in SetVisible.
             for i = 1:length(this.labels)
                 value = this.GetParameter(this.labels{i});
                 s = this.settings.Get(this.labels{i});
-                
+
                 % Create a text label explaining the setting.
                 this.texts(i) = uicontrol(....
                     'Parent', this.panel,...
@@ -171,7 +172,7 @@ classdef SettingsPanel < handle
                     'Style', 'Text',...
                     'String', s.name,...
                     'TooltipString', s.tooltip);
-                
+
                 switch this.types{i}
                     case {'char', 'numeric'}
                         this.controls(i) = uicontrol(...
@@ -258,15 +259,35 @@ classdef SettingsPanel < handle
                             'Units', 'Normalized',...
                             'Interruptible', 'off',...
                             'Callback', {@this.BrowseCallback, this.labels{i}});
+                    case 'file'
+                        this.controls(i) = uicontrol(...
+                            'Parent', this.panel,...
+                            'BackgroundColor', 'white',...
+                            'HorizontalAlignment', 'left',...
+                            'Units', 'Normalized',...
+                            'Style', 'Edit',...
+                            'String', num2str(value),...
+                            'Interruptible', 'off',...
+                            'TooltipString', s.tooltip,...
+                            'Callback', {@this.CheckCallback,...
+                            @s.Check, @s.Callback});
+                        this.browseButtons(i) = uicontrol(...
+                            'Parent', this.panel,...
+                            'Style', 'pushbutton',...
+                            'String', 'open',...
+                            'HorizontalAlignment', 'left',...
+                            'Units', 'Normalized',...
+                            'Interruptible', 'off',...
+                            'Callback', {@this.BrowseFileCallback, this.labels{i}});
                     otherwise
                         error(['The inputed control type ''%s'' is not '...
                             'recognized by SettingsPanel'], this.types{i})
                 end
             end
-            
+
             this.SetVisible(this.shownCategories, this.shownLevels);
         end
-        
+
         function BrowseCallback(this, ~, ~, aLabel)
             % Called when the browse button of a path textbox is pushed.
             %
@@ -275,7 +296,7 @@ classdef SettingsPanel < handle
             % Inputs:
             % aLabel - Label of the 'path' field that the browse button is
             %          associated with.
-            
+
             % Start in whatever directory is currently selected. The
             % selected directory may not exist though and therefore we
             % start in the lowest super-directory which exists. If even the
@@ -286,20 +307,51 @@ classdef SettingsPanel < handle
                     ~strcmpi(fileparts(startPath), startPath)
                 startPath = fileparts(startPath);
             end
-            
+
             % Let the user select a directory.
             selectedPath = UiGetMultipleDirs(...
                 'Title', 'Select a directory',...
                 'Path', startPath,...
                 'MultiSelect', false);
-            
+
             % Change to the selected directory.
             if ~isempty(selectedPath)
                 this.SetParameter(aLabel, selectedPath)
                 this.SetVisible(this.shownCategories, this.shownLevels);
             end
         end
-        
+
+        function BrowseFileCallback(this, ~, ~, aLabel)
+            % Called when the browse button of a file textbox is pushed.
+            %
+            % The function opens a file selection GUI.
+            %
+            % Inputs:
+            % aLabel - Label of the 'file' field that the browse button is
+            %          associated with.
+
+            % Start in whatever directory is currently selected. The
+            % selected directory may not exist though and therefore we
+            % start in the lowest super-directory which exists. If even the
+            % drive letter is incorrect, we will end up in the current
+            % directory.
+            startPath = this.GetValue(aLabel);
+            while ~exist(startPath, 'file') &&...
+                    ~strcmpi(fileparts(startPath), startPath)
+                startPath = fileparts(startPath);
+            end
+
+            % Let the user select a directory.
+            [selFile, selPath] = uigetfile('*.tif');
+            selectedPath = fullfile(selPath, selFile);
+
+            % Change to the selected directory.
+            if exist(selectedPath, 'file')
+                this.SetParameter(aLabel, selectedPath)
+                this.SetVisible(this.shownCategories, this.shownLevels);
+            end
+        end
+
         function Enable(this, aLabel, aState)
             % Sets the 'Enable' property of a control and its label.
             %
@@ -312,15 +364,15 @@ classdef SettingsPanel < handle
             % aState - The value that the 'Enable' property of the control
             %          and its label will be set to. The valid alternatives
             %          are 'on', 'off', and 'inactive'.
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
             set(this.texts(index), 'Enable', aState)
             set(this.controls(index), 'Enable', aState)
-            if strcmpi(this.types{index}, 'path')
+            if strcmpi(this.types{index}, 'path') || strcmpi(this.types{index}, 'file')
                 set(this.browseButtons(index), 'Enable', aState)
             end
         end
-        
+
         function oAlternatives = GetAlternatives(this, aLabel, aLevel)
             % Returns all alternatives of a popupmenu or list setting.
             %
@@ -336,7 +388,7 @@ classdef SettingsPanel < handle
             %          alternatives. If this input is 'all', alternatives
             %          from all complexity levels will be returned. The
             %          input can be a cell array with multiple levels.
-            
+
             if length(this.parameters) == 1
                 % Just return the alternatives if there is a single
                 % parameter set.
@@ -349,7 +401,7 @@ classdef SettingsPanel < handle
                     allAlternatives = [allAlternatives
                         this.settings.Get(aLabel).GetAlternatives(this.parameters(i), aLevel)]; %#ok<AGROW>
                 end
-                
+
                 % Determine which alternatives are included for all parameter
                 % sets, by counting the number of occurrences of each
                 % alternative. This assumes that alternatives can not be
@@ -361,7 +413,7 @@ classdef SettingsPanel < handle
                         oAlternatives = [oAlternatives; candidates(i)]; %#ok<AGROW>
                     end
                 end
-                
+
                 % Add the mixed alternative if the parameter sets have
                 % different values for the setting.
                 if strcmp(this.GetParameter(aLabel), '*****MIXED*****')
@@ -369,18 +421,18 @@ classdef SettingsPanel < handle
                 end
             end
         end
-        
+
         function oControl = GetControl(this, aLabel)
             % Returns the control object corresponding to a setting.
             %
             % Inputs:
             % aLabel - Setting id.
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
             assert(~isempty(index), 'There is no such label in the SettingsPanel')
             oControl = this.controls(index);
         end
-        
+
         function oIndex = GetIndex(this, aLabel)
             % Get the selected indices for a popupmenu or list setting.
             %
@@ -398,14 +450,14 @@ classdef SettingsPanel < handle
             %
             % See also:
             % GetAlternatives, GetValue
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
             assert(~isempty(index), 'There is no such label in the SettingsPanel')
             assert(strcmp(this.types{index}, 'choice') || strcmp(this.types{index}, 'list'),...
                 'GetIndex is only available for popupmenus and listboxes')
             oIndex = sort(get(this.controls(index), 'Value'));
         end
-        
+
         function oValue = GetValue(this, aLabel)
             % Returns the selected value for a setting.
             %
@@ -423,18 +475,18 @@ classdef SettingsPanel < handle
             %
             % See also:
             % GetIndex, GetControlValue, GetParameter
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
-            
+
             assert(~isempty(index), 'There is no such label in the SettingsPanel')
-            
+
             if length(this.parameters) == 1
                 oValue = this.parameters.Get(aLabel);
             else
                 oValue = {this.parameters.Get(aLabel)};
             end
         end
-        
+
         function SetAlternatives(this, aLabel, aLevel, aAlternatives)
             % Sets the alternatives of a popupmenu or list setting.
             %
@@ -452,11 +504,11 @@ classdef SettingsPanel < handle
             %
             % See also:
             % GetAlternaives, Setting
-            
+
             this.settings.Get(aLabel).SetAlternatives(aLevel, aAlternatives);
             this.SetVisible(this.shownCategories, this.shownLevels)
         end
-        
+
         function SetIndex(this, aLabel, aIndex)
             % Sets the selected indices for a popupmenu or list setting.
             %
@@ -467,16 +519,16 @@ classdef SettingsPanel < handle
             %
             % See also:
             % SetValue
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
-            
+
             assert(~isempty(index), 'There is no such label in the SettingsPanel')
             assert(strcmp(this.types{index}, 'choice') || strcmp(this.types{index}, 'list'),...
                 'GetIndex is only available for popupmenus and listboxes')
-            
+
             set(this.controls(index), 'Value', aIndex)
         end
-        
+
         function SetValue(this, aLabel, aValue)
             % Sets the value of a setting for all parameter sets.
             %
@@ -485,15 +537,15 @@ classdef SettingsPanel < handle
             % Inputs:
             % aLabel - Setting id.
             % aValue - New value for the setting.
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
-            
+
             assert(~isempty(index), 'There is no such label in the SettingsPanel')
-            
+
             this.parameters.Set(aLabel, aValue)
             this.SetVisible(this.shownCategories, this.shownLevels)
         end
-        
+
         function SetVisible(this, aCategories, aLevels)
             % Updates the values, visibility and positions of controls.
             %
@@ -503,10 +555,10 @@ classdef SettingsPanel < handle
             % Inputs:
             % aCategories - Setting categories which should be shown.
             % aLevels - Setting levels that should be shown.
-            
+
             this.shownLevels = aLevels;
             this.shownCategories = aCategories;
-            
+
             for i = 1:length(this.labels)
                 % Set the visibility based on level and category.
                 if this.GetVisible(this.labels{i})
@@ -518,11 +570,11 @@ classdef SettingsPanel < handle
                     set(this.texts(i), 'Visible', 'off')
                     continue
                 end
-                
+
                 % Update the value of the control.
                 value = this.GetParameter(this.labels{i});
                 switch this.types{i}
-                    case {'char' 'path'}
+                    case {'char' 'path' 'file'}
                         set(this.controls(i), 'String', value);
                     case 'numeric'
                         set(this.controls(i), 'String', num2str(value));
@@ -552,10 +604,10 @@ classdef SettingsPanel < handle
                             'Value', sel)
                 end
             end
-            
+
             this.PositionControls();
         end
-        
+
         function SwitchSettings(this, aParams, varargin)
             % Replaces the parameter sets corresponding to all settings.
             %
@@ -575,23 +627,23 @@ classdef SettingsPanel < handle
             %                alternatives, when the updating loop gets to
             %                that setting. The order of the settings can
             %                therefore matter.
-            
+
             aKeepSettings = GetArgs({'KeepSettings'}, {{}}, true, varargin);
-            
+
             if ~isempty(aKeepSettings)
                 assert(length(this.parameters) == 1,...
                     'KeepSettings can not be true when there are multiple parameter sets.')
-                
+
                 for i = 1:length(this.labels)
                     label = this.labels{i};
                     s = this.settings.Get(label);
-                    
+
                     if ~any(strcmp(aKeepSettings, s.category))
                         continue
                     end
-                    
+
                     value = this.parameters.Get(label);
-                    
+
                     % Do not use the old value if it is not one of the
                     % alternatives for the new parameter
                     if any(strcmp({'choice' 'list'}, this.types{i}))
@@ -600,17 +652,17 @@ classdef SettingsPanel < handle
                             continue
                         end
                     end
-                    
+
                     aParams.Set(label, value)
                 end
             end
-            
+
             this.parameters = aParams;
-            
+
             this.SetVisible(this.shownCategories, this.shownLevels);
         end
     end
-    
+
     methods (Access = private)
         function CheckCallback(this, aObj, aEvent, aFun, aAfterCallback)
             % Callback executed when the value of a control is altered.
@@ -629,17 +681,17 @@ classdef SettingsPanel < handle
             %        alowed for the setting.
             % aAfterCallback - Callback associated with the Setting object
             %                  corresponding to the control object.
-            
+
             % Remove focus from the control.
             if this.removeFocus
                 set(aObj, 'Enable', 'off')
                 drawnow()
                 set(aObj, 'Enable', 'on')
             end
-            
+
             % Get the setting which corresponds to the uicontrol.
             label = this.labels{this.controls == aObj};
-            
+
             % Check if the proposed value is valid and go back to the old
             % value if it is not.
             if strcmp(get(aObj, 'Style'), 'edit')
@@ -665,9 +717,9 @@ classdef SettingsPanel < handle
                     this.SetParameter(label, value)
                 end
             end
-            
+
             this.SetVisible(this.shownCategories, this.shownLevels)
-            
+
             % Execute the callback associated with the setting.
             if ~isempty(aAfterCallback)
                 if iscell(aAfterCallback)
@@ -677,7 +729,7 @@ classdef SettingsPanel < handle
                 end
             end
         end
-        
+
         function oValue = GetControlValue(this, aLabel)
             % Returns the value specified in a control object.
             %
@@ -696,10 +748,10 @@ classdef SettingsPanel < handle
             %
             % See also:
             % GetValue, GetParameter
-            
+
             index = find(strcmpi(this.labels, aLabel), 1);
             switch this.types{index}
-                case {'char' 'path'}
+                case {'char' 'path' 'file'}
                     oValue = get(this.controls(index), 'String');
                 case 'numeric'
                     oValue = str2num(get(this.controls(index), 'String')); %#ok<ST2NM>
@@ -721,7 +773,7 @@ classdef SettingsPanel < handle
                     oValue = strings(selection);
             end
         end
-        
+
         function oSetting = GetParameter(this, aLabel)
             % Returns a parameter value for a control object.
             %
@@ -739,7 +791,7 @@ classdef SettingsPanel < handle
             %
             % See also:
             % GetValue, GetControlValue
-            
+
             oSetting = this.parameters(1).Get(aLabel);
             for i = 2:length(this.parameters)
                 if ~isequaln(oSetting, this.parameters(i).Get(aLabel))
@@ -748,7 +800,7 @@ classdef SettingsPanel < handle
                 end
             end
         end
-        
+
         function oVisible = GetVisible(this, aLabel)
             % Determines if the control of a setting should be visible.
             %
@@ -761,9 +813,9 @@ classdef SettingsPanel < handle
             %
             % See also:
             % SetVisible
-            
+
             s = this.settings.Get(aLabel);
-            
+
             for i = 1:length(this.parameters)
                 oVisible = any(strcmpi(this.shownLevels, s.level)) &&...
                     any(strcmpi(this.shownCategories, s.category)) &&...
@@ -773,7 +825,7 @@ classdef SettingsPanel < handle
                 end
             end
         end
-        
+
         function PositionControls(this)
             % Sets the sizes and the positions of all control objects.
             %
@@ -790,7 +842,7 @@ classdef SettingsPanel < handle
             %
             % See also:
             % SetVisible
-            
+
             % Determine the number of rows taken up by each control object.
             dRows = zeros(length(this.labels),1);
             for i = 1:length(this.labels)
@@ -805,20 +857,20 @@ classdef SettingsPanel < handle
                     end
                 end
             end
-            
+
             % The height of one control row in normalized units.
             rowHeight = min(1/sum(dRows), this.maxRowHeight);
-            
+
             % Set the heights and positions of all controls.
             row = 0;
             for i = 1:length(this.labels)
                 % A control is assumed to be visible whenever its text is.
                 if strcmp(get(this.texts(i), 'Visible'), 'on')
                     row = row + dRows(i);
-                    
+
                     set(this.texts(i),...
                         'Position', [0 1-row*rowHeight 1 dRows(i)*rowHeight])
-                    
+
                     switch this.types{i}
                         case 'check'
                             set(this.controls(i), 'Position',...
@@ -829,7 +881,7 @@ classdef SettingsPanel < handle
                             set(this.controls(i), 'Position',...
                                 [0 1-row*rowHeight...
                                 1 (dRows(i)*rowHeight)*0.9])
-                        case 'path'
+                        case {'path' 'file'}
                             set(this.controls(i), 'Position',...
                                 [this.split 1-row*rowHeight...
                                 (1-this.split)*0.8 dRows(i)*rowHeight])
@@ -844,7 +896,7 @@ classdef SettingsPanel < handle
                 end
             end
         end
-        
+
         function SetParameter(this, aLabel, aValue)
             % Alters the values of a setting and its downstream settings.
             %
@@ -864,43 +916,43 @@ classdef SettingsPanel < handle
             %
             % See also:
             % SetValue
-            
+
             % The following 3 variables have one element for each
             % setting/parameter pair which is changed. The variables are
             % used when changes are taken back.
-            
+
             % Indices of all altered parameters including the primary one.
             alteredImages = [];
             % Indices of the altered settings.
             alteredSettings = [];
             % Cell array with old values of all changed parameters.
             oldValues = {};
-            
+
             % The names of all setting which are downstream of aLabel.
             altered = [aLabel; this.settings.Get(aLabel).alters];
-            
+
             for i = 1:length(this.parameters)
                 p = this.parameters(i);
-                
+
                 % Find the default values before the change.
                 oldDefaults = cell(length(altered),1);
                 for j = 2:length(altered)
                     oldDefaults{j} = this.settings.Get(altered{j}).GetDefault(p);
                 end
-                
+
                 % Store information about the change of the primary
                 % setting, so that it can be reverted.
                 alteredImages = [alteredImages; i]; %#ok<AGROW>
                 alteredSettings = [alteredSettings; 1]; %#ok<AGROW>
                 oldValues = [oldValues; {p.Get(aLabel)}]; %#ok<AGROW>
-                
+
                 % Perform the change.
                 p.Set(aLabel, aValue)
-                
+
                 for j = 2:length(altered)
                     alt = altered{j};
                     s = this.settings.Get(alt);
-                    
+
                     % Check if the new default value matches the old one.
                     % If not, the setting is set to the new default.
                     newDefault = s.GetDefault(p);
@@ -910,11 +962,11 @@ classdef SettingsPanel < handle
                         alteredImages = [alteredImages; i]; %#ok<AGROW>
                         alteredSettings = [alteredSettings; j]; %#ok<AGROW>
                         oldValues = [oldValues; {p.Get(alt)}]; %#ok<AGROW>
-                        
+
                         p.Set(alt, newDefault)
                         continue
                     end
-                    
+
                     % Check if the selected values of popupmenus and lists
                     % are still available after the changes done so far. If
                     % not, the setting is set to the new default.
@@ -926,14 +978,14 @@ classdef SettingsPanel < handle
                             alteredImages = [alteredImages; i]; %#ok<AGROW>
                             alteredSettings = [alteredSettings; j]; %#ok<AGROW>
                             oldValues = [oldValues; {p.Get(alt)}]; %#ok<AGROW>
-                            
+
                             p.Set(alt, newDefault)
                             continue
                         end
                     end
                 end
             end
-            
+
             % List of all altered settings.
             alteredSettingsNames = altered(unique(alteredSettings));
             if length(alteredSettingsNames) > 1
@@ -945,7 +997,7 @@ classdef SettingsPanel < handle
                 end
                 answer = questdlg(message,...
                     'Other settings affected', 'Ok', 'Cancel', 'Ok');
-                
+
                 if any(strcmp({'Cancel' ''}, answer))
                     % Revert all the changes.
                     for i = 1:length(alteredImages)
