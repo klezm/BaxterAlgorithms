@@ -75,9 +75,9 @@ catch
                 'you can delete the file.'], savePath)
         end
     end
-    SaveCellsTif(ImageData(aSeqPath), aCells, aVersion, false,...
-        'SaveDeaths', true, 'SaveFP', true);
 end
+SaveCellsTif(ImageData(aSeqPath), aCells, aVersion, false,...
+    'SaveDeaths', true, 'SaveFP', true);
 
 if aCompact
     if aCompressCopy
@@ -87,16 +87,16 @@ if aCompact
         % This alters the Cells that were given as input.
         cellData_compact = cellData;
     end
-    
+
     % Compress all cell objects.
     for i = 1:length(cellData_compact)
         cellData_compact(i).Compress();
     end
-    
+
     if ~exist([saveDir filesep 'Compact'], 'dir')
         mkdir([saveDir filesep 'Compact'])
     end
-    
+
     % Save compressed cell data.
     save(fullfile(saveDir, 'Compact', [saveName '.mat']),...
         'cellData_compact', '-v7')

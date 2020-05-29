@@ -43,7 +43,7 @@ function oCells = SaveCellsTif(aImData, aCells, aVer, aForEvaluation, varargin)
 
 % Parse property/value inputs.
 [aSaveDeaths, aSaveFP] =...
-    GetArgs({'SaveDeaths' 'SaveFP'}, {false false}, true, varargin);
+    GetArgs({'SaveDeaths' 'SaveFP'}, {true true}, true, varargin);
 
 % Point blobs can not be represented in the pixel labels.
 areCells = AreCells(aCells);
@@ -115,6 +115,8 @@ for t = 1:aImData.sequenceLength
 end
 
 % Write information about parent-daughter relationships to a txt-file.
+% columns: [cell id] [start frame] [end fame] [parent cell]
+% where the value of the pixel equals the cell id
 fid = fopen(fullfile(aPath, 'res_track.txt'), 'w');
 for i = 1:length(aCells)
     c = aCells(i);
