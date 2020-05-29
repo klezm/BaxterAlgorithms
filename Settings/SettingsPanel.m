@@ -284,7 +284,7 @@ classdef SettingsPanel < handle
                             'recognized by SettingsPanel'], this.types{i})
                 end
             end
-
+            
             this.SetVisible(this.shownCategories, this.shownLevels);
         end
 
@@ -996,8 +996,8 @@ classdef SettingsPanel < handle
                     message = [message sprintf('%s\n', alteredSettingsNames{i})]; %#ok<AGROW>
                 end
                 answer = questdlg(message,...
-                    'Other settings affected', 'Ok', 'Cancel', 'Ok');
-
+                    'Other settings altered', 'Ok', 'Cancel', 'Ok');
+                
                 if any(strcmp({'Cancel' ''}, answer))
                     % Revert all the changes.
                     for i = 1:length(alteredImages)
